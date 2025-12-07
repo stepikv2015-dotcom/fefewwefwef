@@ -1,43 +1,55 @@
 import os
 import logging
 from aiogram import Bot, Dispatcher, types
+from aiogram.client.default import DefaultBotProperties
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.enums import ParseMode
 
 # Настройка логирования
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
-# Получаем токен из переменных окружения (хостинг) или используем напрямую
-BOT_TOKEN = os.getenv('BOT_TOKEN', 'ВАШ_ТОКЕН_БОТА')
+# Получаем токен из переменных окружения (обязательно на хостинге)
+BOT_TOKEN = os.getenv('BOT_TOKEN')
+if not BOT_TOKEN:
+    logger.error("BOT_TOKEN не найден в переменных окружения!")
+    exit("Ошибка: Установите переменную окружения BOT_TOKEN")
 
-# Проверка токена
-if BOT_TOKEN == 'ВАШ_ТОКЕН_БОТА':
-    logger.warning("Используется тестовый токен! Замените на настоящий.")
+# Ссылки на изображения (замените на свои через переменные окружения или здесь)
+WELCOME_IMAGE = os.getenv('WELCOME_IMAGE', 'https://i.imgur.com/ваше_изображение.jpg')
+ABOUT_IMAGE = os.getenv('ABOUT_IMAGE', 'https://i.imgur.com/ваше_изображение2.jpg')
+BUY_IMAGE = os.getenv('BUY_IMAGE', 'https://i.imgur.com/ваше_изображение3.jpg')
+PAYMENT_IMAGE = os.getenv('PAYMENT_IMAGE', 'https://i.imgur.com/ваше_изображение4.jpg')
 
-# Ссылки на изображения (замените на свои)
-WELCOME_IMAGE = os.getenv('WELCOME_IMAGE', 'https://i.postimg.cc/FKG5YJdP/izobrazenie-2025-12-07-221133329.png')
-ABOUT_IMAGE = os.getenv('ABOUT_IMAGE', 'https://i.postimg.cc/qRbT5CpZ/izobrazenie-2025-12-07-221050897.png')
-BUY_IMAGE = os.getenv('BUY_IMAGE', 'https://i.postimg.cc/xTb26Ch6/izobrazenie-2025-12-07-221107661.png')
-PAYMENT_IMAGE = os.getenv('PAYMENT_IMAGE', 'https://i.postimg.cc/qRbT5CpZ/izobrazenie-2025-12-07-221050897.png')
-
-# Реквизиты для оплаты (замените на свои)
+# Реквизиты для оплаты (настройте через переменные окружения или здесь)
 PAYMENT_DETAILS = """
 💳 <b>РЕКВИЗИТЫ ДЛЯ ОПЛАТЫ:</b>
 
-📱 <b>QIWI</b>: +7XXXXXXXXXX
-💳 <b>СБП</b>: 2202XXXXXXXXXXXX
-🪙 <b>USDT TRC-20</b>: TXXXXXXXXXXXXXXXXXXX
+📱 <b>QIWI</b>: {qiwi_number}
+💳 <b>СБП</b>: {sbp_number}
+🪙 <b>USDT TRC-20</b>: {usdt_address}
 
-💰 <b>Сумма</b>: 499 рублей
+💰 <b>Сумма</b>: {amount} рублей
 👤 <b>Комментарий к платежу</b>: Укажите ваш ID: {user_id}
 ⚠️ <b>ВАЖНО</b>: Без комментария платеж не будет зачислен!
 """
 
-# Инициализация бота и диспетчера
-bot = Bot(token=BOT_TOKEN, parse_mode=ParseMode.HTML)
+# Получаем реквизиты из переменных окружения
+QIWI_NUMBER = os.getenv('QIWI_NUMBER', '+7XXXXXXXXXX')
+SBP_NUMBER = os.getenv('SBP_NUMBER', '2202XXXXXXXXXXXX')
+USDT_ADDRESS = os.getenv('USDT_ADDRESS', 'TXXXXXXXXXXXXXXXXXXX')
+PAYMENT_AMOUNT = os.getenv('PAYMENT_AMOUNT', '499')
+
+# Инициализация бота с правильными настройками
+bot = Bot(
+    token=BOT_TOKEN,
+    default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+)
 dp = Dispatcher()
 
 # ========== КЛАВИАТУРЫ ==========
@@ -92,7 +104,7 @@ async def cmd_help(message: types.Message):
         "🤖 <b>Команды бота:</b>\n\n"
         "/start - Запустить бота\n"
         "/help - Помощь\n\n"
-        "💎 При возникновении проблем с оплатой - напишите @ваш_юзернейм"
+        "💎 При возникновении проблем с оплатой - напишите в поддержку"
     )
     await message.answer(help_text)
 
@@ -122,7 +134,7 @@ async def buy_private_callback(callback: types.CallbackQuery):
                 "• 50 эксклюзивных фото\n"
                 "• 10 видео\n"
                 "• Доступ навсегда\n\n"
-                "💰 <b>Цена:</b> 499 руб.",
+                f"💰 <b>Цена:</b> {PAYMENT_AMOUNT} руб.",
         reply_markup=get_buy_keyboard()
     )
     await callback.answer()
@@ -132,7 +144,13 @@ async def confirm_buy_callback(callback: types.CallbackQuery):
     """Кнопка 'Купить'"""
     await callback.message.delete()
     
-    payment_text = PAYMENT_DETAILS.format(user_id=callback.from_user.id)
+    payment_text = PAYMENT_DETAILS.format(
+        qiwi_number=QIWI_NUMBER,
+        sbp_number=SBP_NUMBER,
+        usdt_address=USDT_ADDRESS,
+        amount=PAYMENT_AMOUNT,
+        user_id=callback.from_user.id
+    )
     
     await callback.message.answer_photo(
         photo=PAYMENT_IMAGE,
@@ -153,7 +171,7 @@ async def paid_callback(callback: types.CallbackQuery):
         "📢 <b>После подтверждения оплаты:</b>\n"
         "1. Вам придет уведомление\n"
         "2. Доступ к приватному каналу будет открыт\n\n"
-        "💬 По всем вопросам: @ваш_юзернейм"
+        "💬 <b>По всем вопросам:</b> Свяжитесь с поддержкой"
     )
     
     await callback.message.answer(
@@ -187,18 +205,10 @@ async def back_to_buy_callback(callback: types.CallbackQuery):
                 "• 50 эксклюзивных фото\n"
                 "• 10 видео\n"
                 "• Доступ навсегда\n\n"
-                "💰 <b>Цена:</b> 499 руб.",
+                f"💰 <b>Цена:</b> {PAYMENT_AMOUNT} руб.",
         reply_markup=get_buy_keyboard()
     )
     await callback.answer()
-
-# ========== ОБРАБОТКА ОШИБОК ==========
-
-@dp.errors()
-async def errors_handler(update, exception):
-    """Обработка ошибок"""
-    logger.error(f"Ошибка: {exception}", exc_info=True)
-    return True
 
 # ========== ЗАПУСК БОТА ==========
 
@@ -215,4 +225,3 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
-
